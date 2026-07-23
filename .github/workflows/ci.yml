@@ -1,0 +1,40 @@
+name: CI
+
+# :local/root paths only resolve inside the monorepo checkout, so the test
+# job reconstructs the workspace layout by checking out the kotoba-lang/crm
+# sibling (PUBLIC, no token needed) into the expected relative path.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - uses: DeLaGuardo/setup-clojure@13.4
+        with: { cli: latest }
+      - name: clj-kondo (errors fail the build)
+        run: clojure -M:lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: orgs/cloud-itonami/cloud-itonami-regulatory-tracker }
+      - uses: actions/checkout@v4
+        with:
+          repository: kotoba-lang/crm
+          path: orgs/kotoba-lang/crm
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - uses: DeLaGuardo/setup-clojure@13.4
+        with: { cli: latest }
+      - name: test
+        working-directory: orgs/cloud-itonami/cloud-itonami-regulatory-tracker
+        run: clojure -M:test
