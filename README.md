@@ -94,6 +94,82 @@ is pure and side-effect-free — persisting the returned `:record` is the
 caller's own responsibility, mirroring `kotoba.crm.pipeline`'s
 storage-agnostic posture.
 
+## Named tracks
+
+Every function above has a track-taking arity. `reg/tracks` holds the
+registered chains as data; `reg/default-track` is `:regulatory-submission`,
+the chain this library shipped with, unchanged.
+
+```clojure
+(reg/valid-transition? track from to)
+(reg/next-stages track from)
+(reg/terminal-stage? track stage)
+(reg/transition-violations track current-stage to-stage evidence)
+(reg/apply-transition track existing transition)
+```
+
+An **unregistered track fails closed**: no transition validates, no next
+stage is offered, `terminal-stage?` answers `true`, and
+`transition-violations` returns `:unknown-regulatory-track`. A typo'd
+track id must never end up validating against a different chain.
+
+Note that `:regulatory-track` inside a `transition` map is **not** the
+chain selector — it is free-form caller data (`:india-cdsco`, `:gcc-gso`,
+…) and always has been. Track selection is explicit, via the extra
+arity, or it does not happen.
+
+### `:jpn-account-freeze`
+
+Japan's 振り込め詐欺救済法 account-freeze and victim-redistribution chain
+(犯罪利用預金口座等に係る資金による被害回復分配金の支払等に関する法律),
+per the Japanese Bankers Association's published description
+(<https://www.zenginkyo.or.jp/hanzai/rescure/>, retrieved 2026-07-29):
+
+```
+:reported → :suspension → :extinguishment-notice → :rights-extinguished
+          → :distribution-notice → :distribution-paid
+exits: :suspension-lifted | :no-distribution
+```
+
+`:reported` is the implicit start state, exactly as `:draft` is on the
+submission chain — a brand-new freeze transitions `nil → :suspension`.
+
+This track carries two things the submission chain does not, because both
+failure modes are real here and conflating them would let one silently
+satisfy the other:
+
+**Lateness** (`:time-critical-stages #{:suspension}`). A freeze can be
+perfectly ordered, fully evidenced, and worthless because it landed after
+the money left. `window-verdict` reports three states from two
+caller-supplied ground-truth quantities:
+
+```clojure
+(reg/window-verdict {:window-elapsed-hours 4.317 :window-hours 23.317})  ;=> :inside
+(reg/window-verdict {:window-elapsed-hours 26.967 :window-hours 23.317}) ;=> :outside
+(reg/window-verdict {:window-elapsed-hours 4.317})                       ;=> :unknown-not-measured
+```
+
+`:unknown-not-measured` is not a softer `:inside`. It is what the record
+says forever when nobody measured, and `apply-transition` writes it into
+the history entry so a freeze can never later be read as "we got it in
+time" on the strength of nobody having checked. Absent, malformed, NaN,
+infinite and nonsensical inputs all read as unmeasured rather than as
+either verdict — the safe direction. There is no clock in this library;
+both quantities are ground truth the caller supplies, like
+`evidence-keys`.
+
+Lateness never blocks. A late freeze still has to be recordable, and
+truthfully.
+
+**Statutory notice minima** (`:minimum-notice-days {:rights-extinguished
+60 :distribution-paid 30}`). These are minimum *durations for a notice
+period*, not deadlines: 90 days where the statute demands 60 is
+compliant, 45 is not. Because the floor is a number the statute fixes,
+`:too-short` is a definite finding and `transition-violations` raises
+`:notice-period-too-short`. An **absent** `:notice-days` is not a
+violation — it is recorded as `:unknown-not-measured`, same discipline as
+lateness.
+
 ## Deviation from `hygaccess.regulatory`'s reference chain
 
 `hygaccess.regulatory`'s own hand-written transition table fans
