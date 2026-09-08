@@ -93,7 +93,7 @@
   its own governor (this library does not preclude a caller from being
   stricter than it is -- it only declines to hand-roll that strictness
   itself)."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [kotoba.crm.pipeline :as pipeline]))
 
 ;; ----------------------------- SubmissionRecord shape -----------------------------
