@@ -8,7 +8,7 @@
   nothing to do with hygiene products) -- the concrete evidence that
   extraction actually generalized the reference implementation, not
   merely renamed it."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [cloud-itonami.regulatory-tracker.core :as reg]))
 
 ;; ----------------------------- stage-chain structural invariants -----------------------------
